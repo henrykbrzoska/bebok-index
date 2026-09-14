@@ -1,0 +1,6 @@
+{
+  "name": "bebok-index",
+  "version": "1.6.0",
+  "min_engine_version": "1.5.0",
+  "description": "Per-instance code index for Bebok: file scan, tantivy full-text search, background orchestrator and filesystem watcher."
+}
