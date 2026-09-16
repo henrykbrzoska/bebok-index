@@ -55,7 +55,7 @@ The slot manifest (`bebok-plugin.json`) carries the entrypoints:
 | --- | --- |
 | `entrypoint` | `bebok-index --plugin-server` |
 | `entrypoint_windows` | `bebok-index.exe --plugin-server` |
-| `entrypoint_unix` | `sh -c "chmod +x ./bebok-index && exec ./bebok-index --plugin-server"` |
+| `entrypoint_unix` | `sh -c "if [ $(uname) = Darwin ]; then B=./bebok-index-macos; else B=./bebok-index; fi; chmod +x $B && exec $B --plugin-server"` |
 | `prompt_file` | `AGENT_INDEX.md` |
 
 `prompt_file` names the prompt file in the slot: the engine reads
@@ -66,35 +66,37 @@ built-in prompt, so old slots keep working.
 ## Release assets
 
 Every `vX.Y.Z` tag is built and published by
-[`.github/workflows/release.yml`](./.github/workflows/release.yml)
-(matrix: `windows-latest`, `ubuntu-latest`, `macos-latest`). Each leg uploads
-one archive plus a `checksums.txt`:
+[`.github/workflows/release.yml`](./.github/workflows/release.yml):
+three build legs (`windows-latest`, `ubuntu-latest`, `macos-latest`)
+compile the binary and upload it as a workflow artifact; the `assemble` job
+(`ubuntu-latest`) merges them into ONE universal asset plus a `checksums.txt`
+and publishes the GitHub release.
 
-| asset | runner | contents |
-| --- | --- | --- |
-| `bebok-index-X.Y.Z-win-x64.zip` | windows-latest | `bebok-index.exe`, `bebok-plugin.json`, `AGENT_INDEX.md` at the **archive root** (no wrapping folder) |
-| `bebok-index-X.Y.Z-linux-x64.tar.gz` | ubuntu-latest | exactly one top-level `bebok-index-X.Y.Z/` directory holding `bebok-index`, `bebok-plugin.json`, `AGENT_INDEX.md` |
-| `bebok-index-X.Y.Z-macos-arm64.tar.gz` | macos-latest | same layout as Linux |
-| `checksums.txt` | every leg | `<sha256>  <asset>` lines; the digest goes into the registry as `asset_sha256` |
+| asset | contents |
+| --- | --- |
+| `bebok-index-X.Y.Z.zip` | `bebok-index.exe` (Windows), `bebok-index` (Linux), `bebok-index-macos` (macOS), `bebok-plugin.json`, `AGENT_INDEX.md` — all at the **archive root** (no wrapping folder) |
+| `checksums.txt` | `<sha256>  bebok-index-X.Y.Z.zip`; the digest goes into the registry as `asset_sha256` |
 
-The layout rules are the engine's, which detects the format from the URL suffix
-only: a `.zip` must keep every file at the archive root (a wrapping directory
-would bury the manifest), a `.tar.gz` must wrap everything in **exactly one**
-top-level directory, which the engine strips on unpack. The downloader requires
-`https`, verifies SHA-256 (64 hex chars), caps the transfer at 256 MiB / 60 s,
-and rejects symlinks and absolute or `..` entries.
+One universal `.zip` because the engine registry carries a single `asset_url`
+per plugin (no per-OS templating — the installer downloads the URL verbatim),
+so every platform binary must ship in one package. The layout rule is the
+engine's, which detects the format from the URL suffix only: a `.zip` must
+keep every file at the archive root (a wrapping directory would bury the
+manifest). The downloader requires `https`, verifies SHA-256 (64 hex chars),
+caps the transfer at 256 MiB / 60 s, and rejects symlinks and absolute or `..`
+entries.
 
 Release prerequisites:
 
 - The tag version must equal `version` in `Cargo.toml` **and** in
   `bebok-plugin.json`; the workflow fails before building otherwise.
-- The workflow packages `target/release/bebok-index[.exe]` (falling back to
-  `bebok-code-index[.exe]`) and fails with a clear message when
-  `cargo build --release` produced no executable — the crate must expose a
-  binary target named `bebok-index` for a release to be publishable.
+- Each leg packages `target/release/bebok-index[.exe]` and fails with a clear
+  message when `cargo build --release --bin bebok-index` produced no
+  executable — the crate must keep the `bebok-index` binary target.
 - Publishing uses the preinstalled `gh` CLI with the workflow `GITHUB_TOKEN`;
-  the first matrix leg creates the release, later legs (and re-runs) upload into
-  it with `--clobber`.
+  the `assemble` job creates the release, re-runs upload into it with
+  `--clobber`. Only first-party actions are used (`checkout`,
+  `upload-artifact`, `download-artifact`) plus `dtolnay/rust-toolchain@stable`.
 
 ### Why the Unix entrypoint is a `sh -c` shim
 
@@ -105,12 +107,14 @@ after an asset install the Unix slot has a binary with no exec bit. A bare
 though the same manifest works after a `git clone` in an environment where the
 file kept its mode.
 
-The shim sidesteps that: `/bin/sh -c "chmod +x ./bebok-index && exec
-./bebok-index --plugin-server"` runs in the slot dir (the engine's cwd), makes
-the binary executable first, and `exec` replaces the shell so the JSON-lines
-stdio talks to the plugin directly and no wrapper process lingers. The engine's
-entrypoint parser honours quotes, so the whole `-c` argument stays a single
-argv entry.
+The shim sidesteps that: `/bin/sh -c "if [ $(uname) = Darwin ]; then
+B=./bebok-index-macos; else B=./bebok-index; fi; chmod +x $B && exec $B
+--plugin-server"` runs in the slot dir (the engine's cwd), picks the binary
+matching the OS (the universal zip carries `bebok-index` for Linux and
+`bebok-index-macos` for macOS side by side), makes it executable first, and
+`exec` replaces the shell so the JSON-lines stdio talks to the plugin
+directly and no wrapper process lingers. The engine's entrypoint parser
+honours quotes, so the whole `-c` argument stays a single argv entry.
 
 Once the engine preserves exec bits on unpack, `entrypoint_unix` can be dropped
 (or simplified to `bebok-index --plugin-server`, which is exactly the generic
