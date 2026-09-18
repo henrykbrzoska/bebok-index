@@ -1,11 +1,15 @@
 [package]
 name = "bebok-code-index"
-version = "1.6.0"
+version = "1.6.1"
 edition = "2024"
 rust-version = "1.85"
 license = "UNLICENSED"
 repository = "https://github.com/henrykbrzoska/bebok-index"
 description = "Per-instance code index for Bebok: file scan, tantivy full-text search, background orchestrator and filesystem watcher."
+
+[[bin]]
+name = "bebok-index"
+path = "src/bin/bebok-index.rs"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }

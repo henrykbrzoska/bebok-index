@@ -1,6 +1,10 @@
 {
   "name": "bebok-index",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "min_engine_version": "1.5.0",
-  "description": "Per-instance code index for Bebok: file scan, tantivy full-text search, background orchestrator and filesystem watcher."
+  "description": "Per-instance code index for Bebok: file scan, tantivy full-text search, background orchestrator and filesystem watcher.",
+  "entrypoint": "bebok-index --plugin-server",
+  "entrypoint_windows": "bebok-index.exe --plugin-server",
+  "entrypoint_unix": "sh -c \"if [ $(uname) = Darwin ]; then B=./bebok-index-macos; else B=./bebok-index; fi; chmod +x $B && exec $B --plugin-server\"",
+  "prompt_file": "AGENT_INDEX.md"
 }
