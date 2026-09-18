@@ -31,8 +31,6 @@ use crate::{CODE_INDEX_DISABLED, CODE_INDEX_INDEXING, CODE_INDEX_READY};
 
 /// Debounce window for filesystem change bursts (ms).
 pub const DEBOUNCE_MS: u64 = 1500;
-/// Max files read into tantivy per (re)build; the scan cap comes from config.
-pub const MAX_TANTIVY_DOCS: usize = 20_000;
 /// Max bytes of file content fed to tantivy per document.
 pub const MAX_CONTENT_BYTES: usize = 256 * 1024;
 
@@ -387,7 +385,7 @@ fn build_blocking(
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0);
-    for f in scanned.iter().take(MAX_TANTIVY_DOCS) {
+    for f in scanned.iter() {
         let prev = meta.get(&f.rel);
         // Incremental fast path: unchanged files keep their old tantivy doc.
         // Tantivy `rebuild` below rewrites everything anyway (simple + correct);

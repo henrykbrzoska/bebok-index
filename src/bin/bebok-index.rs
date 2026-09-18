@@ -28,8 +28,10 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Default hit limit when the request carries no `limit`.
 const DEFAULT_LIMIT: usize = 5;
-/// Scan cap per backend (matches the engine-side default scale).
-const MAX_FILES: usize = 10_000;
+/// Scan cap per backend: none — index every file the scan finds.
+/// (Previously `MAX_FILES = 10_000`; the cap is removed so large projects
+/// are never truncated.)
+const MAX_FILES_UNCAPPED: usize = usize::MAX;
 /// How long `search` waits for the first build (engine times out at 30 s).
 const QUERY_WAIT_TOTAL_MS: u64 = 25_000;
 /// Poll interval while waiting for `ready`.
@@ -109,7 +111,7 @@ impl Server {
             PathBuf::from(directory),
             index_dir,
             vec![],
-            MAX_FILES,
+            MAX_FILES_UNCAPPED,
             self.enabled,
             noop,
         );
